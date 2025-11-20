@@ -13,7 +13,9 @@ class Settings(BaseSettings):
     environment: str = "development"
     
     # CORS
-    cors_origins: str = "http://localhost:3000"
+    # 개발 편의를 위해 로컬 프론트 여러 포트를 기본 허용 (필요시 .env 에서 덮어쓰기)
+    # '*' 로 설정하면 모든 출처 허용(개발 전용). 운영환경에서는 .env 로 정확히 설정하세요.
+    cors_origins: str = "*"
     
     # JWT Configuration
     jwt_secret_key: str = "your-secret-key-change-this-in-production-min-32-characters"

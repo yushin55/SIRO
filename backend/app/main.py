@@ -6,7 +6,8 @@ from app.routes import (
     auth, users, logs, projects, keywords, 
     evidence, endorsements, portfolios,
     reflections, recommendations, ai,
-    dashboard, search, notifications, upload
+    dashboard, search, notifications, upload,
+    survey
 )
 
 app = FastAPI(
@@ -42,6 +43,7 @@ app.include_router(search.router, prefix="/api/search", tags=["검색"])
 app.include_router(upload.router, prefix="/api/upload", tags=["파일 업로드"])
 app.include_router(evidence.router, prefix="/api/verifications", tags=["증명 및 인증"])
 app.include_router(endorsements.router, prefix="/api/endorsements", tags=["동료 인증"])
+app.include_router(survey.router, prefix="/api/v1/survey", tags=["설문"])
 
 @app.get("/", tags=["Health Check"])
 async def root():
