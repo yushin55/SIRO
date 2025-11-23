@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 
 const JobSimulation = dynamic(() => import('@/components/JobSimulation'), { ssr: false });
-const JobResult = dynamic(() => import('@/components/JobResult'), { ssr: false });
+const JobResult = dynamic(() => import('@/components/JobResultNew'), { ssr: false });
 
 const categories = [
   { value: 'all', label: '전체' },
@@ -323,7 +323,15 @@ export default function RecommendationsPage() {
         
         const data = await response.json();
         console.log('✅ API Response:', data);
-        console.log('📊 Activities count:', data?.data?.activities?.length || 0);
+        console.log('📊 Raw data type:', typeof data, Array.isArray(data));
+        
+        // 백엔드가 배열을 직접 반환하는 경우 처리
+        if (Array.isArray(data)) {
+          console.log('📊 Array response detected, count:', data.length);
+          return { data: { activities: data } };
+        }
+        
+        console.log('📊 Activities count:', data?.data?.activities?.length || data?.activities?.length || 0);
         
         return data;
       } catch (err) {
@@ -372,7 +380,15 @@ export default function RecommendationsPage() {
     },
   });
 
-  const recommendedActivities: RecommendedActivity[] = activitiesData?.data?.activities || [];
+  // 백엔드 응답이 배열을 직접 반환하는 경우와 { data: { activities: [] } } 형태 모두 처리
+  const rawActivities = activitiesData?.data?.activities || activitiesData?.activities || [];
+  
+  // Activity[] 를 RecommendedActivity[] 로 변환
+  const recommendedActivities: RecommendedActivity[] = rawActivities.map((activity: Activity) => ({
+    activity: activity,
+    match_score: 0.85, // 기본 매칭 점수
+    match_reasons: ['데이터베이스 기반 추천', '관심 분야 일치']
+  }));
   
   console.log('🎯 Parsed recommendedActivities:', recommendedActivities);
   console.log('🎯 recommendedActivities length:', recommendedActivities.length);

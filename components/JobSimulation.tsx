@@ -931,7 +931,20 @@ export default function JobSimulationModal({
       toast.success(`분석 완료! 당신에게 가장 맞는 직무는 "${jobName}"입니다! 🎉`);
       
       setTimeout(() => {
-        onComplete(topJob, jobName, selectedDepartment, scores);
+        // 객체 형태로 전달
+        onComplete({
+          topJob: topJob,
+          topJobName: jobName,
+          department: selectedDepartment,
+          scores: {
+            MKT: scores.MKT || 0,
+            PM: scores.PM || 0,
+            DATA: scores.DATA || 0,
+            DEV: scores.DEV || 0,
+            DESIGN: scores.DESIGN || 0,
+            PEOPLE: scores.PEOPLE || scores.HR || 0
+          }
+        });
       }, 1500);
     }, 2000);
   };

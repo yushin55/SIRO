@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Sparkles, Trophy, TrendingUp, Target, Lightbulb, ExternalLink, Bookmark, Calendar, Users } from 'lucide-react';
-import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer } from 'recharts';
+import { X, Sparkles, Trophy, TrendingUp, Target, Lightbulb, ExternalLink, Bookmark, Calendar, Users, Building2, GraduationCap, Code, Briefcase, ChevronRight, ArrowUpRight, BarChart3, PieChart, DollarSign } from 'lucide-react';
+import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Cell } from 'recharts';
 import toast from 'react-hot-toast';
 import { RecommendedActivity } from '@/types/activity';
 
@@ -18,6 +18,19 @@ interface JobResultProps {
     PEOPLE: number;
   };
   onClose: () => void;
+}
+
+interface JobDetail {
+  rank: number;
+  code: string;
+  name: string;
+  score: number;
+  description: string;
+  responsibilities: string[];
+  skills: string[];
+  companies: string[];
+  salary: string;
+  growth: string;
 }
 
 const jobDescriptions: {[key: string]: {
@@ -153,6 +166,16 @@ export default function JobResultModal({ topJob, topJobName, scores, onClose }: 
   const [recommendedActivities, setRecommendedActivities] = useState<RecommendedActivity[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(true);
 
+  // scores가 undefined인 경우 기본값 설정
+  const safeScores = scores || {
+    MKT: 0,
+    PM: 0,
+    DATA: 0,
+    DEV: 0,
+    DESIGN: 0,
+    PEOPLE: 0
+  };
+
   const jobInfo = jobDescriptions[topJob] || jobDescriptions['PM'];
   
   // 직무 코드를 한글 직무명으로 매핑
@@ -170,12 +193,12 @@ export default function JobResultModal({ topJob, topJobName, scores, onClose }: 
 
   // Recharts용 데이터 변환
   const radarData = [
-    { subject: '마케팅', value: scores.MKT, fullMark: 20 },
-    { subject: 'PM', value: scores.PM, fullMark: 20 },
-    { subject: '데이터', value: scores.DATA, fullMark: 20 },
-    { subject: '개발', value: scores.DEV, fullMark: 20 },
-    { subject: '디자인', value: scores.DESIGN, fullMark: 20 },
-    { subject: '피플', value: scores.PEOPLE, fullMark: 20 }
+    { subject: '마케팅', value: safeScores.MKT, fullMark: 20 },
+    { subject: 'PM', value: safeScores.PM, fullMark: 20 },
+    { subject: '데이터', value: safeScores.DATA, fullMark: 20 },
+    { subject: '개발', value: safeScores.DEV, fullMark: 20 },
+    { subject: '디자인', value: safeScores.DESIGN, fullMark: 20 },
+    { subject: '피플', value: safeScores.PEOPLE, fullMark: 20 }
   ];
 
   useEffect(() => {
@@ -194,7 +217,7 @@ export default function JobResultModal({ topJob, topJobName, scores, onClose }: 
         body: JSON.stringify({
           topJob,
           topJobName,
-          scores
+          scores: safeScores
         })
       });
 
@@ -366,7 +389,7 @@ export default function JobResultModal({ topJob, topJobName, scores, onClose }: 
               </ResponsiveContainer>
             </div>
             <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-4">
-              {Object.entries(scores).map(([key, value]) => {
+              {Object.entries(safeScores).map(([key, value]) => {
                 const names: {[k: string]: string} = {
                   MKT: '마케팅', PM: 'PM', DATA: '데이터', 
                   DEV: '개발', DESIGN: '디자인', PEOPLE: '피플'
