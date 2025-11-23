@@ -44,12 +44,18 @@ const negativeReasons = [
 export default function MicroLogPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    activityType: string;
+    memo: string;
+    moodCompare: string;
+    reason: string;
+    suggestedTags: string[];
+  }>({
     activityType: '',
     memo: '',
     moodCompare: '',
     reason: '',
-    suggestedTags: [] as string[],
+    suggestedTags: [],
   });
 
   // 사용자 기본 기분 체크
@@ -81,7 +87,13 @@ export default function MicroLogPage() {
       return response.json();
     },
     onSuccess: (data) => {
-      setFormData(prev => ({ ...prev, suggestedTags: data.tags }));
+      setFormData(prev => ({ ...prev, suggestedTags: data?.tags || [] }));
+      setStep(3);
+    },
+    onError: () => {
+      // AI 태그 생성 실패해도 다음 단계로 진행
+      toast('AI 태그 생성을 건너뜁니다', { icon: 'ℹ️' });
+      setFormData(prev => ({ ...prev, suggestedTags: [] }));
       setStep(3);
     },
   });
@@ -259,7 +271,7 @@ export default function MicroLogPage() {
             </div>
 
             {/* AI가 제안한 태그 표시 */}
-            {formData.suggestedTags.length > 0 && (
+            {formData.suggestedTags && formData.suggestedTags.length > 0 && (
               <div className="bg-[#DDF3EB] rounded-xl p-4 border border-[#25A778]/20">
                 <div className="flex items-start gap-3">
                   <Sparkles className="w-5 h-5 text-[#25A778] flex-shrink-0 mt-0.5" />
@@ -268,8 +280,8 @@ export default function MicroLogPage() {
                       AI가 분석한 활동 유형
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {formData.suggestedTags.map((tag) => (
-                        <span key={tag} className="px-3 py-1 bg-white/50 rounded-lg text-sm text-[#186D50]">
+                      {formData.suggestedTags.map((tag, index) => (
+                        <span key={`${tag}-${index}`} className="px-3 py-1 bg-white/50 rounded-lg text-sm text-[#186D50]">
                           {tag}
                         </span>
                       ))}
