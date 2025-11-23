@@ -1,21 +1,22 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { Plus, Sparkles, TrendingUp, Calendar, BookOpen, Heart, Target } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 // 활동 타입별 아이콘 및 라벨 매핑
 const getActivityInfo = (activityType: string) => {
   const map: Record<string, { icon: string; label: string }> = {
-    contest: { icon: '🏆', label: '공모전' },
-    club: { icon: '👥', label: '동아리' },
-    project: { icon: '💻', label: '프로젝트' },
-    internship: { icon: '💼', label: '인턴' },
-    study: { icon: '📚', label: '스터디' },
-    etc: { icon: '✨', label: '기타' },
+    contest: { icon: '', label: '공모전' },
+    club: { icon: '', label: '동아리' },
+    project: { icon: '', label: '프로젝트' },
+    internship: { icon: '', label: '인턴' },
+    study: { icon: '', label: '스터디' },
+    etc: { icon: '', label: '기타' },
   };
-  return map[activityType] || { icon: '✨', label: '활동' };
+  return map[activityType] || { icon: '', label: '활동' };
 };
 
 export default function ReflectionsPage() {
@@ -64,6 +65,39 @@ export default function ReflectionsPage() {
     },
   });
 
+  // 전체 로그(요약용) - 마이크로 로그 + AI 회고 (limit 높게) -> 통계 계산
+  const { data: allMicro } = useQuery({
+    queryKey: ['micro-logs-all-summary'],
+    queryFn: async () => {
+      const resp = await fetch('/api/v1/reflections/micro?limit=200', {
+        headers: { 'x-user-id': localStorage.getItem('x-user-id') || 'dev-user-default' },
+      });
+      return resp.json();
+    },
+  });
+
+  const { data: allStars } = useQuery({
+    queryKey: ['star-reflections-all-summary'],
+    queryFn: async () => {
+      const resp = await fetch('/api/v1/reflections?limit=200', {
+        headers: { 'x-user-id': localStorage.getItem('x-user-id') || 'dev-user-default' },
+      });
+      return resp.json();
+    },
+  });
+
+  // 내 스페이스 목록 (진행중 스페이스 삭제 기능 제공)
+  const { data: mySpaces } = useQuery({
+    queryKey: ['my-spaces'],
+    queryFn: async () => {
+      const resp = await fetch('/api/v1/spaces', {
+        headers: { 'x-user-id': localStorage.getItem('x-user-id') || 'dev-user-default' },
+      });
+      return resp.json();
+    },
+  });
+  const queryClient = useQueryClient();
+
   // 사용자 오늘의 컨디션 (0-100)
   const [health, setHealth] = useState<string>('50');
 
@@ -77,16 +111,35 @@ export default function ReflectionsPage() {
   // 마이크로 로그와 STAR 회고 합치기
   const microLogs = recentLogs?.data?.logs || [];
   const starReflectionsList = starReflections?.data?.reflections || [];
-  const starLogs = starReflectionsList.map((reflection: any) => ({
-    id: reflection.id,
-    activity_type: 'reflection',
-    activity_label: reflection.template_name || 'AI 회고',
-    activity_icon: '✨',
-    memo: Object.values(reflection.answers || {}).join(' ').substring(0, 100),
-    date: reflection.created_at,
-    tags: reflection.competencies || [],
-    isStarReflection: true,
-  }));
+  const starLogs = starReflectionsList.map((reflection: any) => {
+    // answers 객체에서 실제 답변 추출
+    let memoText = '';
+    if (reflection.answers && typeof reflection.answers === 'object') {
+      const answerValues = Object.values(reflection.answers);
+      if (answerValues.length > 0) {
+        // 첫 번째 답변을 주로 표시 (STAR의 Situation 등)
+        memoText = String(answerValues[0]).substring(0, 150);
+      }
+    }
+    
+    // answers가 없으면 ai_feedback이나 content 사용
+    if (!memoText && reflection.ai_feedback) {
+      memoText = String(reflection.ai_feedback).substring(0, 150);
+    } else if (!memoText && reflection.content) {
+      memoText = String(reflection.content).substring(0, 150);
+    }
+    
+    return {
+      id: reflection.id,
+      activity_type: 'reflection',
+      activity_label: reflection.template_name || 'AI 회고',
+      activity_icon: '',
+      memo: memoText,
+      date: reflection.created_at,
+      tags: reflection.competencies || [],
+      isStarReflection: true,
+    };
+  });
   
   // 날짜순으로 정렬하여 합치기
   const logs = [...microLogs, ...starLogs]
@@ -99,6 +152,54 @@ export default function ReflectionsPage() {
     ...baseStats,
     total_logs: (baseStats.total_logs || 0) + starReflectionsList.length,
   };
+
+  // 추가 통계 계산 (클라이언트 측 요약)
+  const allMicroLogs = allMicro?.data?.logs || [];
+  const allStarLogs = allStars?.data?.reflections || [];
+  const allCombined = [...allMicroLogs, ...allStarLogs].sort((a: any, b: any) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime());
+
+  const totalReflections = allCombined.length;
+  const thisWeekCount = allCombined.filter((l: any) => {
+    const d = new Date(l.created_at || l.date);
+    const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+    return d >= weekAgo;
+  }).length;
+
+  // 연속 작성(최근 날짜들에서 streak 계산)
+  const computeStreak = () => {
+    if (!allCombined.length) return 0;
+    const dates = Array.from(new Set(allCombined.map((l: any) => (new Date(l.created_at || l.date)).toISOString().slice(0,10)))).sort().reverse();
+    let streak = 0;
+    let cursor = new Date().toISOString().slice(0,10);
+    for (let i = 0; i < dates.length; i++) {
+      if (dates[i] <= cursor) {
+        if (dates[i] === cursor) {
+          streak += 1;
+          const prev = new Date(cursor); prev.setDate(prev.getDate() - 1); cursor = prev.toISOString().slice(0,10);
+        } else {
+          break;
+        }
+      }
+    }
+    return streak;
+  };
+  const consecutiveDays = computeStreak();
+
+  const activityTypesCount = allCombined.reduce((acc: any, cur: any) => {
+    const key = cur.activity_type || (cur.template_name ? 'AI 회고' : 'other');
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  const spacesCount = new Set(allCombined.map((l: any) => l.space_id).filter(Boolean)).size;
+
+  // 성장 키워드(top N)
+  const keywordCounts: Record<string, number> = {};
+  allCombined.forEach((l: any) => {
+    const tags = l.tags || l.competencies || [];
+    tags.forEach((t: string) => { keywordCounts[t] = (keywordCounts[t] || 0) + 1; });
+  });
+  const growthKeywords = Object.entries(keywordCounts).sort((a,b)=>b[1]-a[1]).slice(0,5).map(e=>({k:e[0], c:e[1]}));
 
   return (
     <div className="min-h-screen bg-[#F1F2F3]">
@@ -139,13 +240,17 @@ export default function ReflectionsPage() {
                     max={100}
                     value={Number(health)}
                     className="w-64"
-                    onChange={async (e) => {
+                    onChange={(e) => {
                       const v = e.currentTarget.value;
                       setHealth(v);
                       localStorage.setItem('today_health', v);
-
-                      // Save to backend
+                    }}
+                  />
+                  <span className="text-2xl font-bold text-[#6B2A00] w-16 text-center">{health}</span>
+                  <button
+                    onClick={async () => {
                       try {
+                        const currentSpaceId = localStorage.getItem('current-space-id');
                         await fetch('/api/v1/health-check', {
                           method: 'POST',
                           headers: {
@@ -154,16 +259,21 @@ export default function ReflectionsPage() {
                             'x-user-id': localStorage.getItem('x-user-id') || 'dev-user-default',
                           },
                           body: JSON.stringify({
-                            health_score: parseInt(v),
+                            health_score: parseInt(health),
+                            space_id: currentSpaceId || null,
                             date: new Date().toISOString().split('T')[0]
                           })
                         });
+                        toast.success('컨디션이 저장되었습니다!');
                       } catch (error) {
                         console.error('Failed to save health check:', error);
+                        toast.error('저장에 실패했습니다');
                       }
                     }}
-                  />
-                  <span className="text-sm text-[#6B6D70]">현재: <strong>{health}점</strong></span>
+                    className="btn-primary px-4 py-2"
+                  >
+                    저장하기
+                  </button>
                 </div>
               </div>
             </div>
@@ -173,9 +283,17 @@ export default function ReflectionsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           {/* 이번 주 통계 */}
           <div className="card">
-            <div className="flex items-center gap-2 mb-3">
-              <Calendar className="w-5 h-5 text-[#25A778]" />
-              <h3 className="font-bold text-[#1B1C1E]">이번 주</h3>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-[#25A778]" />
+                <h3 className="font-bold text-[#1B1C1E]">이번 주</h3>
+              </div>
+              <button
+                onClick={() => router.push('/dashboard/reflections/history?filter=week')}
+                className="text-xs text-[#25A778] hover:text-[#186D50]"
+              >
+                더보기
+              </button>
             </div>
             <div className="text-3xl font-bold text-[#25A778] mb-1">
               {stats?.total_logs || 0}개
@@ -184,14 +302,22 @@ export default function ReflectionsPage() {
           </div>
 
           <div className="card">
-            <div className="flex items-center gap-2 mb-3">
-              <Heart className="w-5 h-5 text-[#DC2626]" />
-              <h3 className="font-bold text-[#1B1C1E]">좋았던 경험</h3>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Heart className="w-5 h-5 text-[#DC2626]" />
+                <h3 className="font-bold text-[#1B1C1E]">좋았던 경험</h3>
+              </div>
+              <button
+                onClick={() => router.push('/dashboard/reflections/history?filter=favorites')}
+                className="text-xs text-[#DC2626] hover:text-[#B91C1C]"
+              >
+                더보기
+              </button>
             </div>
             <div className="text-3xl font-bold text-[#DC2626] mb-1">
               {stats?.positive_logs || 0}개
             </div>
-            <p className="text-sm text-[#6B6D70]">평소보다 기분 좋았던 날</p>
+            <p className="text-sm text-[#6B6D70]">내가 좋아요한 기록</p>
           </div>
 
           <div className="card">
@@ -243,6 +369,51 @@ export default function ReflectionsPage() {
           </button>
         </div>
 
+        {/* 진행중인 스페이스 목록 (삭제 가능) */}
+        <div className="card mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold">진행중인 스페이스</h3>
+            <button onClick={() => queryClient.invalidateQueries({ queryKey: ['my-spaces'] })} className="text-sm text-[#6B6D70]">새로고침</button>
+          </div>
+          <div className="space-y-3">
+            {mySpaces?.data?.map((s: any) => (
+              <div key={s.id} className="flex items-center justify-between p-3 bg-[#F8F9FA] rounded-xl">
+                <div>
+                  <div className="font-medium">{s.name}</div>
+                  <div className="text-xs text-[#6B6D70]">멤버 {s.member_count || 1}명</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => router.push(`/dashboard/reflections/history?space_id=${encodeURIComponent(s.id)}`)}
+                    className="text-sm text-[#25A778] mr-2"
+                  >
+                    전체보기
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm('스페이스를 삭제하면 복구할 수 없습니다. 삭제하시겠습니까?')) return;
+                      try {
+                        const res = await fetch(`/api/v1/spaces/${s.id}`, { method: 'DELETE', headers: { 'x-user-id': localStorage.getItem('x-user-id') || 'dev-user-default' } });
+                        if (!res.ok) throw new Error('삭제 실패');
+                        toast.success('스페이스가 삭제되었습니다');
+                        queryClient.invalidateQueries({ queryKey: ['my-spaces'] });
+                        queryClient.invalidateQueries({ queryKey: ['active-spaces'] });
+                      } catch (e) {
+                        console.error(e);
+                        toast.error('삭제에 실패했습니다');
+                      }
+                    }}
+                    className="text-sm text-red-600"
+                  >
+                    삭제
+                  </button>
+                </div>
+              </div>
+            ))}
+            {!mySpaces?.data?.length && <div className="text-sm text-[#6B6D70]">진행중인 스페이스가 없습니다</div>}
+          </div>
+        </div>
+
         {/* 최근 기록 */}
         <div className="card">
           <div className="flex items-center justify-between mb-6">
@@ -251,7 +422,7 @@ export default function ReflectionsPage() {
               onClick={() => router.push('/dashboard/reflections/history')}
               className="text-sm text-[#25A778] hover:text-[#186D50] font-medium"
             >
-              전체보기 →
+              더보기 →
             </button>
           </div>
 
@@ -274,25 +445,22 @@ export default function ReflectionsPage() {
             <div className="space-y-3">
               {logs.map((log: any) => {
                 const activityInfo = log.isStarReflection 
-                  ? { icon: log.activity_icon || '✨', label: log.activity_label || 'AI 회고' }
+                  ? { icon: log.activity_icon || '', label: log.activity_label || 'AI 회고' }
                   : getActivityInfo(log.activity_type);
                 
                 return (
                   <div
                     key={log.id}
-                    className="p-4 bg-[#F8F9FA] rounded-xl hover:bg-white border-2 border-transparent hover:border-[#EAEBEC] transition-all cursor-pointer"
-                    onClick={() => router.push(`/dashboard/reflections/${log.id}`)}
+                    className="p-4 bg-[#F8F9FA] rounded-xl hover:bg-white border-2 border-transparent hover:border-[#EAEBEC] transition-all cursor-pointer group"
                   >
-                    <div className="flex items-start gap-4">
-                      <div className="text-3xl flex-shrink-0">{activityInfo.icon}</div>
+                    <div 
+                      className="flex items-start gap-4"
+                      onClick={() => router.push(`/dashboard/reflections/${log.id}`)}
+                    >
+                      {activityInfo.icon && <div className="text-3xl flex-shrink-0">{activityInfo.icon}</div>}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-medium text-[#1B1C1E]">{activityInfo.label}</span>
-                          {log.isStarReflection && (
-                            <span className="px-2 py-0.5 bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs rounded-full">
-                              AI
-                            </span>
-                          )}
                           <span className="text-xs text-[#6B6D70]">
                             {new Date(log.date || log.created_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}
                           </span>
@@ -308,7 +476,23 @@ export default function ReflectionsPage() {
                           ))}
                         </div>
                       </div>
-                      {/* mood icon removed - health check replaces daily mood */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // TODO: 좋아요 토글 API 호출
+                          toast.success(log.is_favorited ? '좋아요 취소' : '좋아요!');
+                        }}
+                        className={`flex-shrink-0 p-2 rounded-lg transition-all ${
+                          log.is_favorited 
+                            ? 'text-[#DC2626] bg-red-50' 
+                            : 'text-[#9CA3AF] hover:text-[#DC2626] hover:bg-red-50'
+                        }`}
+                      >
+                        <Heart 
+                          className="w-5 h-5" 
+                          fill={log.is_favorited ? 'currentColor' : 'none'}
+                        />
+                      </button>
                     </div>
                   </div>
                 );
