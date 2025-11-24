@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Trophy, Code, Users, Briefcase, Calendar, CalendarDays, CalendarRange, ClipboardList, Sparkles, ArrowLeft } from 'lucide-react';
 
 export default function NewSpacePage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
   
   // 개발 환경: localStorage에 기본 사용자 ID 설정
@@ -94,9 +95,12 @@ export default function NewSpacePage() {
     },
     onSuccess: (data) => {
       toast.success('스페이스가 생성되었습니다!');
+      // 회고 홈의 스페이스 목록 쿼리 무효화
+      queryClient.invalidateQueries({ queryKey: ['active-spaces'] });
       // 백엔드에서 직접 객체를 반환하므로 data.id로 접근
       setCreatedSpaceId(data.id);
-      setStep(3); // 팀원 초대 단계로 이동
+      // 바로 스페이스 상세 페이지로 이동
+      router.push(`/dashboard/spaces/${data.id}`);
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -163,6 +167,8 @@ export default function NewSpacePage() {
       if (!response.ok) throw new Error('초대 전송 실패');
       
       toast.success(`${validEmails.length}명에게 초대를 보냈습니다!`);
+      // 회고 홈의 스페이스 목록 쿼리 무효화
+      queryClient.invalidateQueries({ queryKey: ['active-spaces'] });
       router.push(`/dashboard/spaces/${createdSpaceId}`);
     } catch (error) {
       console.error('Invite failed:', error);
@@ -173,6 +179,8 @@ export default function NewSpacePage() {
   };
 
   const handleSkipInvite = () => {
+    // 회고 홈의 스페이스 목록 쿼리 무효화
+    queryClient.invalidateQueries({ queryKey: ['active-spaces'] });
     router.push(`/dashboard/spaces/${createdSpaceId}`);
   };
 

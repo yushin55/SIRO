@@ -183,6 +183,9 @@ function ChatbotReflectionContent() {
       // Gemini를 사용한 역량 분석
       const analysisResult = await analyzeCompetencies(answers);
       
+      // 현재 스페이스 ID 가져오기
+      const currentSpaceId = localStorage.getItem('current-space-id');
+      
       // 백엔드에 저장
       try {
         const response = await fetch('/api/v1/reflections', {
@@ -193,6 +196,7 @@ function ChatbotReflectionContent() {
             'x-user-id': localStorage.getItem('x-user-id') || 'dev-user-default',
           },
           body: JSON.stringify({
+            space_id: currentSpaceId || null, // 스페이스 ID 추가
             template_id: template.id,
             template_name: template.name,
             answers: answers,

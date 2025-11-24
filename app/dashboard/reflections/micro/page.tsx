@@ -2,47 +2,48 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Sparkles, CheckCircle2 } from 'lucide-react';
 
 // 활동 유형
 const activityTypes = [
-  { id: 'lecture', label: '강의 / 팀플', icon: '📚', color: 'from-blue-400 to-cyan-400' },
-  { id: 'club', label: '학회 / 동아리', icon: '👥', color: 'from-purple-400 to-pink-400' },
-  { id: 'contest', label: '공모전 / 프로젝트', icon: '🏆', color: 'from-orange-400 to-red-400' },
-  { id: 'intern', label: '인턴 / 아르바이트', icon: '💼', color: 'from-green-400 to-emerald-400' },
-  { id: 'study', label: '자격증 / 공부', icon: '📖', color: 'from-yellow-400 to-orange-400' },
-  { id: 'other', label: '기타', icon: '✨', color: 'from-gray-400 to-gray-500' },
+  { id: 'lecture', label: '강의 / 팀플', color: 'bg-blue-50 border-blue-200 hover:bg-blue-100' },
+  { id: 'club', label: '학회 / 동아리', color: 'bg-purple-50 border-purple-200 hover:bg-purple-100' },
+  { id: 'contest', label: '공모전 / 프로젝트', color: 'bg-orange-50 border-orange-200 hover:bg-orange-100' },
+  { id: 'intern', label: '인턴 / 아르바이트', color: 'bg-green-50 border-green-200 hover:bg-green-100' },
+  { id: 'study', label: '자격증 / 공부', color: 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100' },
+  { id: 'other', label: '기타', color: 'bg-gray-50 border-gray-200 hover:bg-gray-100' },
 ];
 
 // 평소 대비 기분 (Preference Pulse)
 const moodCompare = [
-  { id: 'worse', label: '평소보다 더 별로였다', emoji: '😞', color: '#DC2626' },
-  { id: 'same', label: '평소랑 비슷했다', emoji: '😐', color: '#6B6D70' },
-  { id: 'better', label: '평소보다 더 좋았다', emoji: '😊', color: '#25A778' },
+  { id: 'worse', label: '평소보다 더 별로였다', color: '#DC2626' },
+  { id: 'same', label: '평소랑 비슷했다', color: '#6B6D70' },
+  { id: 'better', label: '평소보다 더 좋았다', color: '#25A778' },
 ];
 
 // 좋았을 때 질문
 const positiveReasons = [
-  { id: 'communication', label: '사람들과 의견 주고받는 게 재밌었다', icon: '💬' },
-  { id: 'creativity', label: '아이디어가 떠오르는 게 짜릿했다', icon: '💡' },
-  { id: 'problem_solving', label: '문제가 깔끔하게 해결되는 게 시원했다', icon: '✓' },
-  { id: 'helping', label: '누군가에게 도움이 된 느낌이 좋았다', icon: '🤝' },
-  { id: 'achievement', label: '결과/성과가 나오는 게 뿌듯했다', icon: '🎯' },
+  { id: 'communication', label: '사람들과 의견 주고받는 게 재밌었다' },
+  { id: 'creativity', label: '아이디어가 떠오르는 게 짜릿했다' },
+  { id: 'problem_solving', label: '문제가 깔끔하게 해결되는 게 시원했다' },
+  { id: 'helping', label: '누군가에게 도움이 된 느낌이 좋았다' },
+  { id: 'achievement', label: '결과/성과가 나오는 게 뿌듯했다' },
 ];
 
 // 힘들었을 때 질문
 const negativeReasons = [
-  { id: 'conflict', label: '사람들 사이 조율/갈등', icon: '⚠️' },
-  { id: 'no_idea', label: '아이디어가 안 떠오름', icon: '💭' },
-  { id: 'data_work', label: '숫자·자료 처리', icon: '📊' },
-  { id: 'time_energy', label: '시간·체력 소모', icon: '⏰' },
-  { id: 'no_meaning', label: '내가 왜 이걸 해야 하는지 모르겠는 느낌', icon: '❓' },
+  { id: 'conflict', label: '사람들 사이 조율/갈등' },
+  { id: 'no_idea', label: '아이디어가 안 떠오름' },
+  { id: 'data_work', label: '숫자·자료 처리' },
+  { id: 'time_energy', label: '시간·체력 소모' },
+  { id: 'no_meaning', label: '내가 왜 이걸 해야 하는지 모르겠는 느낌' },
 ];
 
 export default function MicroLogPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<{
     activityType: string;
@@ -101,11 +102,12 @@ export default function MicroLogPage() {
   // 마이크로 로그 저장
   const saveMicroLogMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const response = await fetch('/api/reflections/micro', {
+      const currentSpaceId = localStorage.getItem('current-space-id');
+      const response = await fetch('/api/v1/reflections/micro', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': localStorage.getItem('x-user-id') || '',
+          'x-user-id': localStorage.getItem('x-user-id') || 'dev-user-default',
         },
         body: JSON.stringify({
           activity_type: data.activityType,
@@ -113,7 +115,8 @@ export default function MicroLogPage() {
           mood_compare: data.moodCompare,
           reason: data.reason,
           tags: data.suggestedTags,
-          date: new Date().toISOString(),
+          date: new Date().toISOString().split('T')[0],
+          space_id: currentSpaceId || null,
         }),
       });
 
@@ -123,9 +126,21 @@ export default function MicroLogPage() {
 
       return response.json();
     },
-    onSuccess: () => {
-      toast.success('오늘의 활동이 기록되었습니다! 🎉');
-      router.push('/dashboard/reflections');
+    onSuccess: (data) => {
+      toast.success('오늘의 활동이 기록되었습니다!');
+      // 쿼리 무효화하여 목록에 반영
+      queryClient.invalidateQueries({ queryKey: ['micro-logs-recent'] });
+      queryClient.invalidateQueries({ queryKey: ['micro-logs-all'] });
+      queryClient.invalidateQueries({ queryKey: ['micro-logs-all-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['star-reflections-recent'] });
+      queryClient.invalidateQueries({ queryKey: ['star-reflections-all-summary'] });
+      // 저장된 기록 ID로 상세 페이지로 이동
+      const logId = data?.data?.id || data?.id;
+      if (logId) {
+        router.push(`/dashboard/reflections/${logId}`);
+      } else {
+        router.push('/dashboard/reflections');
+      }
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -217,13 +232,10 @@ export default function MicroLogPage() {
                 <button
                   key={activity.id}
                   onClick={() => handleActivitySelect(activity.id)}
-                  className={`group p-6 rounded-2xl border-2 transition-all hover:scale-105 bg-gradient-to-br ${activity.color}`}
+                  className={`p-6 rounded-xl border-2 transition-all ${activity.color}`}
                 >
-                  <div className="text-center">
-                    <div className="text-5xl mb-3">{activity.icon}</div>
-                    <div className="font-bold text-white text-lg drop-shadow-md">
-                      {activity.label}
-                    </div>
+                  <div className="text-center font-semibold text-[#1B1C1E]">
+                    {activity.label}
                   </div>
                 </button>
               ))}
@@ -296,10 +308,9 @@ export default function MicroLogPage() {
                 <button
                   key={mood.id}
                   onClick={() => handleMoodSelect(mood.id)}
-                  className="w-full p-4 rounded-xl border-2 border-[#EAEBEC] bg-white hover:border-[#25A778] hover:bg-[#DDF3EB] transition-all flex items-center gap-4"
+                  className="w-full p-4 rounded-xl border-2 border-[#EAEBEC] bg-white hover:border-[#25A778] hover:bg-[#DDF3EB] transition-all"
                 >
-                  <div className="text-4xl">{mood.emoji}</div>
-                  <div className="flex-1 text-left font-medium text-[#1B1C1E]">
+                  <div className="font-medium text-[#1B1C1E] text-center">
                     {mood.label}
                   </div>
                 </button>
@@ -326,10 +337,9 @@ export default function MicroLogPage() {
                   key={reason.id}
                   onClick={() => handleReasonSelect(reason.id)}
                   disabled={saveMicroLogMutation.isPending}
-                  className="w-full p-4 rounded-xl border-2 border-[#EAEBEC] bg-white hover:border-[#25A778] hover:bg-[#DDF3EB] transition-all flex items-center gap-4 disabled:opacity-50"
+                  className="w-full p-4 rounded-xl border-2 border-[#EAEBEC] bg-white hover:border-[#25A778] hover:bg-[#DDF3EB] transition-all disabled:opacity-50"
                 >
-                  <div className="text-3xl">{reason.icon}</div>
-                  <div className="flex-1 text-left font-medium text-[#1B1C1E]">
+                  <div className="font-medium text-[#1B1C1E] text-center">
                     {reason.label}
                   </div>
                 </button>
