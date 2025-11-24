@@ -152,10 +152,10 @@ export default function SpaceDetailPage() {
   });
 
   const typeLabels: Record<string, string> = {
-    contest: '🏆 공모전',
-    project: '💻 프로젝트',
-    club: '👥 동아리',
-    internship: '💼 인턴십',
+    contest: '공모전',
+    project: '프로젝트',
+    club: '동아리',
+    internship: '인턴십',
   };
 
   const cycleLabels: Record<string, string> = {
@@ -218,7 +218,9 @@ export default function SpaceDetailPage() {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                <span className="text-2xl">{typeLabels[space.type]?.split(' ')[0]}</span>
+                <div className="text-sm px-2 py-1 bg-[#F1F2F3] rounded text-[#6B6D70]">
+                  {typeLabels[space.type]}
+                </div>
                 <h1 className="text-3xl font-bold text-[#1B1C1E]">{space.name}</h1>
               </div>
               {space.description && (
@@ -326,7 +328,6 @@ export default function SpaceDetailPage() {
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-xl">{reflection.mood || '😊'}</span>
                           <span className="text-sm font-medium text-[#1B1C1E]">
                             {new Date(reflection.reflection_date || reflection.created_at).toLocaleDateString()}
                           </span>
@@ -345,7 +346,6 @@ export default function SpaceDetailPage() {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <div className="text-4xl mb-3">📝</div>
                   <p className="text-[#6B6D70] mb-4">아직 작성된 회고가 없습니다</p>
                   <button
                     onClick={() => router.push('/dashboard/reflections/survey')}
