@@ -142,9 +142,18 @@ export default function ReflectionsPage() {
   });
   
   // 날짜순으로 정렬하여 합치기
-  const logs = [...microLogs, ...starLogs]
-    .sort((a, b) => new Date(b.date || b.created_at).getTime() - new Date(a.date || a.created_at).getTime())
-    .slice(0, 7);
+  let combinedLogs = [...microLogs, ...starLogs]
+    .sort((a, b) => new Date(b.date || b.created_at).getTime() - new Date(a.date || a.created_at).getTime());
+
+  // STAR 회고 중 내용이 없는(빈) 항목은 표시하지 않음
+  combinedLogs = combinedLogs.filter((l) => {
+    if (l.isStarReflection) {
+      return !!(l.memo && String(l.memo).trim());
+    }
+    return true;
+  });
+
+  const logs = combinedLogs.slice(0, 7);
   
   // 통계에 STAR 회고 포함
   const baseStats = weekStats?.data || {};
@@ -216,8 +225,7 @@ export default function ReflectionsPage() {
                   onClick={() => router.push('/dashboard/reflections/survey')}
                   className="btn-primary flex items-center gap-2 bg-gradient-to-r from-[#25A778] to-[#2DC98E]"
                 >
-                  <Sparkles className="w-5 h-5" />
-                  <span>AI 회고 시작하기</span>
+                  <span>경험 정리 시작</span>
                 </button>
                 {/* 팀 공유 기능은 스페이스 생성에서 관리합니다 */}
             </div>
@@ -226,9 +234,7 @@ export default function ReflectionsPage() {
           {/* 오늘의 컨디션 (0-100) */}
           <div className="bg-gradient-to-r from-[#FFF7ED] to-[#FFFBF0] rounded-xl p-6 border-2 border-[#FFDAB9]/40 mb-6">
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center flex-shrink-0">
-                <Heart className="w-6 h-6 text-[#EF4444]" />
-              </div>
+              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center flex-shrink-0" />
               <div className="flex-1">
                 <h3 className="font-bold text-[#6B2A00] mb-2">오늘의 컨디션</h3>
                 <p className="text-sm text-[#6B2A00] mb-3">오늘의 기분 혹은 팀의 상태를 0(매우 나쁨) ~ 100(매우 좋음)으로 체크해주세요.</p>
@@ -339,11 +345,9 @@ export default function ReflectionsPage() {
             className="card hover:shadow-lg transition-all cursor-pointer text-left bg-gradient-to-br from-[#25A778] to-[#2DC98E] text-white"
           >
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-6 h-6 text-white" />
-              </div>
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0" />
               <div>
-                <h3 className="font-bold mb-1">AI 회고 시작</h3>
+                <h3 className="font-bold mb-1">경험 정리 시작</h3>
                 <p className="text-sm text-white/90">
                   설문으로 맞춤 템플릿 추천받고 회고하기
                 </p>
